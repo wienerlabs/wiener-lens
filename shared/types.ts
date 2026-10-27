@@ -465,6 +465,8 @@ export interface StartupSettings {
   launcher: boolean
   /** Start in the background at login. */
   autostart: boolean
+  /** A dashboard started from the app closes once the app's windows are gone. */
+  quitWhenClosed: boolean
 }
 
 export interface Account {

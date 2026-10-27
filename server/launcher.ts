@@ -37,15 +37,19 @@ function nodeBin(): string {
   return ['/opt/homebrew/bin', '/usr/local/bin', path.dirname(process.execPath)].find(has) ?? path.dirname(process.execPath)
 }
 
-/** The shell command both pieces run: the latest package, in the background, logging to our folder. */
-export function startCommand(): string {
+/**
+ * The shell command both pieces run: the latest package, in the background, logging to our folder.
+ * Started from the app's button it may close again once the app's windows are gone (Settings
+ * decides); started at login it stays up.
+ */
+export function startCommand(quitWhenClosed = true): string {
   const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
   // WIENER_LAUNCHER_PACKAGE points at a local tarball while developing; people get the published package.
   const pkg = process.env.WIENER_LAUNCHER_PACKAGE || PACKAGE
   const bin = nodeBin()
   // A data folder set for this run goes along, so the started dashboard reads the same index.
   const data = process.env.WIENER_DATA_DIR ? `WIENER_DATA_DIR=${q(path.resolve(dataDir()))} ` : ''
-  return `mkdir -p ${q(dataDir())} && ${data}PATH=${q(bin)}:"$PATH" ${q(path.join(bin, 'npx'))} -y --package=${q(pkg)} ${PACKAGE} --background >> ${q(logFile())} 2>&1`
+  return `mkdir -p ${q(dataDir())} && ${data}PATH=${q(bin)}:"$PATH" ${q(path.join(bin, 'npx'))} -y --package=${q(pkg)} ${PACKAGE} --background${quitWhenClosed ? ' --quit-when-closed' : ''} >> ${q(logFile())} 2>&1`
 }
 
 function readPrefs(): Partial<StartupSettings> {
@@ -61,11 +65,15 @@ function writePrefs(prefs: Partial<StartupSettings>): void {
   fs.writeFileSync(prefsFile(), `${JSON.stringify({ ...readPrefs(), ...prefs }, null, 2)}\n`)
 }
 
+/** On unless turned off: what someone who quits the app with Cmd+Q expects. */
+export const quitWhenClosedPref = (): boolean => readPrefs().quitWhenClosed !== false
+
 export function startupSettings(): StartupSettings & { supported: boolean } {
   return {
     supported: supported(),
     launcher: supported() && fs.existsSync(appPath()),
     autostart: supported() && fs.existsSync(agentPath()),
+    quitWhenClosed: quitWhenClosedPref(),
   }
 }
 
@@ -145,7 +153,7 @@ function agentPlist(): string {
   <array>
     <string>/bin/sh</string>
     <string>-c</string>
-    <string>${esc(startCommand())}</string>
+    <string>${esc(startCommand(false))}</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -201,5 +209,7 @@ export function updateStartup(patch: Partial<StartupSettings>): StartupSettings 
     if (patch.autostart) enableAutostart()
     else disableAutostart()
   }
+  // Read by the running server when its last window closes, so it applies right away.
+  if (patch.quitWhenClosed !== undefined) writePrefs({ quitWhenClosed: patch.quitWhenClosed })
   return startupSettings()
 }

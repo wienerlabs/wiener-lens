@@ -230,9 +230,9 @@ export function createApp(ctx: AppContext): Hono {
       return c.json({ error: pick(langOf(c), 'Geçersiz JSON', 'Invalid JSON') }, 400)
     }
     const o = (body && typeof body === 'object' && !Array.isArray(body) ? body : {}) as Record<string, unknown>
-    const patch: { launcher?: boolean; autostart?: boolean } = {}
+    const patch: { launcher?: boolean; autostart?: boolean; quitWhenClosed?: boolean } = {}
     for (const key of Object.keys(o)) {
-      if ((key !== 'launcher' && key !== 'autostart') || typeof o[key] !== 'boolean') {
+      if ((key !== 'launcher' && key !== 'autostart' && key !== 'quitWhenClosed') || typeof o[key] !== 'boolean') {
         return c.json({ error: pick(langOf(c), `Bilinmeyen ya da geçersiz ayar: ${key}`, `Unknown or invalid setting: ${key}`) }, 400)
       }
       patch[key] = o[key] as boolean
@@ -301,11 +301,15 @@ export function createApp(ctx: AppContext): Hono {
       const onLive = send('live')
       ctx.events.on('update', onUpdate)
       ctx.events.on('live', onLive)
+      // Every open dashboard window holds one of these; a background server counts them to know when the app closed.
+      ctx.events.emit('client', 1)
       let open = true
       stream.onAbort(() => {
+        if (!open) return
         open = false
         ctx.events.off('update', onUpdate)
         ctx.events.off('live', onLive)
+        ctx.events.emit('client', -1)
       })
       while (open) {
         await stream.writeSSE({ event: 'ping', data: '' })
@@ -313,6 +317,12 @@ export function createApp(ctx: AppContext): Hono {
       }
     }),
   )
+
+  // Settings' stop button. Answers first, then the server closes.
+  app.post('/api/shutdown', (c) => {
+    setTimeout(() => ctx.events.emit('shutdown'), 150)
+    return c.json({ ok: true })
+  })
 
   app.all('/api/*', (c) => c.json({ error: pick(langOf(c), 'Bulunamadı', 'Not found') }, 404))
 

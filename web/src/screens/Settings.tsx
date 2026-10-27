@@ -37,18 +37,67 @@ export function Settings() {
               )}
             />
             <Toggle
+              setting="quitWhenClosed"
+              on={data.quitWhenClosed}
+              title={tx('Uygulama kapanınca durdur', 'Stop when you quit the app')}
+              text={tx(
+                "Başlat düğmesiyle açılan Wiener Lens, uygulamanın pencereleri kapandıktan (Cmd+Q) 20 saniye sonra kendini kapatır. Kapalıysa arka planda açık kalır; aşağıdaki düğmeyle durdurabilirsin. Terminalden ya da bilgisayar açılınca başlayan Lens'i etkilemez.",
+                "A Wiener Lens started with the Start button closes itself 20 seconds after you quit the app (Cmd+Q). Turned off, it stays up in the background until you stop it with the button below. It doesn't affect a Wiener Lens started from a terminal or at login.",
+              )}
+            />
+            <Toggle
               setting="autostart"
               on={data.autostart}
               title={tx('Bilgisayar açılınca başlat', 'Start when you log in')}
               text={tx(
-                'Oturum açtığında Wiener Lens arka planda başlar; uygulama her zaman doğrudan açılır. Boştayken neredeyse hiç işlemci kullanmaz. macOS bunu Giriş Öğeleri arasında gösterir.',
-                'Wiener Lens starts in the background when you log in, so the app always opens straight to the dashboard. It uses almost no CPU while idle. macOS lists it under Login Items.',
+                'Oturum açtığında Wiener Lens arka planda başlar ve açık kalır; uygulama her zaman doğrudan açılır. Boştayken neredeyse hiç işlemci kullanmaz. macOS bunu Giriş Öğeleri arasında gösterir.',
+                'Wiener Lens starts in the background when you log in and stays up, so the app always opens straight to the dashboard. It uses almost no CPU while idle. macOS lists it under Login Items.',
               )}
             />
           </div>
         )}
       </Card>
+      {DEMO ? null : <StopCard />}
     </div>
+  )
+}
+
+/** Stops the server this dashboard runs on; the installed app then shows its start page. */
+function StopCard() {
+  const [state, setState] = useState<'idle' | 'stopping' | 'error'>('idle')
+  const stop = async () => {
+    setState('stopping')
+    try {
+      const res = await fetch(withLang('/api/shutdown'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+      if (!res.ok) throw new Error()
+      // Once it is down, a reload shows the installed app's start page (or the browser's own error).
+      setTimeout(() => location.reload(), 1500)
+    } catch {
+      setState('error')
+    }
+  }
+  return (
+    <Card>
+      <CardHeader title={tx('Çalışma', 'Running')} />
+      <div className="flex items-start justify-between gap-6 px-5 pb-5">
+        <p className="max-w-[60ch] text-[13px] text-ink-2">
+          {state === 'error'
+            ? tx('Durdurulamadı; panel zaten kapanmış olabilir.', "Couldn't stop it; the dashboard may already be down.")
+            : tx(
+                "Wiener Lens'i şimdi kapatır. Uygulamayı yeniden açınca Başlat düğmesiyle tekrar başlatabilirsin; terminalden başlattıysan orada da kapanır.",
+                'Shuts Wiener Lens down now. Open the app again and its Start button brings it back; if you started it from a terminal, it ends there too.',
+              )}
+        </p>
+        <button
+          type="button"
+          onClick={stop}
+          disabled={state === 'stopping'}
+          className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-danger hover:border-line-strong disabled:opacity-60"
+        >
+          {state === 'stopping' ? tx('Durduruluyor…', 'Stopping…') : tx("Wiener Lens'i durdur", 'Stop Wiener Lens')}
+        </button>
+      </div>
+    </Card>
   )
 }
 
