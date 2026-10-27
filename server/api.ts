@@ -24,6 +24,7 @@ import { toolsReport } from './tools.ts'
 import { yearReport } from './year.ts'
 import { SettingsError, readSettings, updateSettings } from './settings.ts'
 import { statusLineCommand, statusLineConfigured } from './statusline.ts'
+import { startupSettings, updateStartup } from './launcher.ts'
 
 export interface AppContext {
   db: Db
@@ -217,6 +218,31 @@ export function createApp(ctx: AppContext): Hono {
   app.get('/api/year', (c) => {
     const year = Number(c.req.query('year'))
     return c.json(yearReport(scopeOf(c).db, Number.isInteger(year) && year > 2000 && year < 3000 ? year : new Date().getFullYear()))
+  })
+
+  app.get('/api/startup', (c) => c.json(startupSettings()))
+
+  app.put('/api/startup', async (c) => {
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: pick(langOf(c), 'Geçersiz JSON', 'Invalid JSON') }, 400)
+    }
+    const o = (body && typeof body === 'object' && !Array.isArray(body) ? body : {}) as Record<string, unknown>
+    const patch: { launcher?: boolean; autostart?: boolean } = {}
+    for (const key of Object.keys(o)) {
+      if ((key !== 'launcher' && key !== 'autostart') || typeof o[key] !== 'boolean') {
+        return c.json({ error: pick(langOf(c), `Bilinmeyen ya da geçersiz ayar: ${key}`, `Unknown or invalid setting: ${key}`) }, 400)
+      }
+      patch[key] = o[key] as boolean
+    }
+    try {
+      return c.json(updateStartup(patch))
+    } catch (err) {
+      const detail = err instanceof Error ? err.message.split('\n')[0] : String(err)
+      return c.json({ error: pick(langOf(c), `Ayar uygulanamadı: ${detail}`, `Couldn't apply the setting: ${detail}`) }, 500)
+    }
   })
 
   app.get('/api/statusline', (c) => c.json({ command: statusLineCommand(), configured: statusLineConfigured() }))

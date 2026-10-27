@@ -459,6 +459,14 @@ export interface Settings {
   monthlyBudget: number | null
 }
 
+/** Starting the dashboard without a terminal (macOS). */
+export interface StartupSettings {
+  /** The wiener-lens:// launcher behind the installed app's "start" button. */
+  launcher: boolean
+  /** Start in the background at login. */
+  autostart: boolean
+}
+
 export interface Account {
   id: string
   kind: 'account' | 'unknown'

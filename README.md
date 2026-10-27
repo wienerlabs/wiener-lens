@@ -124,12 +124,15 @@ Up to 0.7.0 the package was called `wiener-tools-claude`. The new one reads the 
 
 **Use it as an app.** The dashboard can also open in its own window with its own icon, without the address bar. In Chrome, Edge or Brave, press **Install as app** at the bottom of the menu; in Safari, use **Add to Dock** in the File menu. The app still connects to the server on this computer: if you open it while the server is off, a page shows how to start it, and once `npx wiener-tools-lens` is running the window switches to the dashboard on its own. If a dashboard window is already open, the command doesn't open another tab. The app is tied to the port it was installed from (4747 by default); if the dashboard opens on another port (because that port was taken or you passed `--port`), the app won't see it.
 
+**Start it without a terminal (macOS).** When the server isn't running, the installed app's page has a **Start Wiener Lens** button: it opens a `wiener-lens://` link, a small launcher app starts the dashboard in the background with the latest package, and the window reloads once it is up. Wiener Lens puts the launcher in `~/Library/Application Support/Wiener Lens` the first time it runs; **Settings** (bottom of the left menu) removes it. Settings can also start Wiener Lens in the background when you log in; that is off by default, and turning it on adds a LaunchAgent (`~/Library/LaunchAgents/xyz.wienerlabs.lens.plist`) that turning it off removes. Started this way it logs to `~/.wiener-tools/claude/server.log`, never opens a browser tab of its own, and quits if a dashboard is already running. `--background` does the same from a terminal.
+
 | Option | Default | Description |
 | --- | --- | --- |
 | `--port <n>` | `4747` | Port to listen on; if it is taken, the next one is tried |
 | `--host <h>` | `127.0.0.1` | `0.0.0.0` opens the dashboard to your local network |
 | `--lang <lang>` | your browser's language | Dashboard language: `tr` or `en` |
 | `--no-open` | | Don't open the browser |
+| `--background` | | Start in the background: no browser tab, and quit if a dashboard is already running |
 | `-v`, `--version` | | Show the version |
 
 | Environment variable | Description |

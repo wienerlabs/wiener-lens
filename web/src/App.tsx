@@ -1,4 +1,4 @@
-import { Activity, Boxes, FolderGit2, Gauge, LayoutGrid, Lightbulb, Monitor, MonitorDown, Moon, Receipt, Sparkles, Sun, Wrench } from 'lucide-react'
+import { Activity, Boxes, FolderGit2, Gauge, LayoutGrid, Lightbulb, Monitor, MonitorDown, Moon, Receipt, Settings as SettingsIcon, Sparkles, Sun, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { Account, IndexStatus } from '../../shared/types.ts'
 import { CopyCommand, DemoBanner } from './components/DemoBanner.tsx'
@@ -14,6 +14,7 @@ import { onLinkClick, useLocation } from './lib/router.ts'
 import { Costs } from './screens/Costs.tsx'
 import { Environment } from './screens/Environment.tsx'
 import { Limits } from './screens/Limits.tsx'
+import { Settings } from './screens/Settings.tsx'
 import { Overview } from './screens/Overview.tsx'
 import { Projects } from './screens/Projects.tsx'
 import { Sessions } from './screens/Sessions.tsx'
@@ -41,7 +42,7 @@ export function App() {
   const projectKey = tail('/projeler/')
 
   useEffect(() => {
-    const title = path === '/' ? null : nav().find((n) => n.match(path))?.label
+    const title = path === '/' ? null : path === '/ayarlar' ? tx('Ayarlar', 'Settings') : nav().find((n) => n.match(path))?.label
     document.title = title ? `${title} · Wiener Lens` : 'Wiener Lens'
   }, [path])
 
@@ -76,6 +77,9 @@ export function App() {
         </nav>
         <div className="ml-auto flex items-center gap-2 md:mt-auto md:ml-0 md:flex-col md:items-stretch md:gap-3 md:px-2">
           <InstallButton />
+          <span className="hidden md:block">
+            <SettingsLink />
+          </span>
           <AccountPicker />
           <IndexBadge />
           <div className="hidden items-center gap-2 sm:flex md:justify-between">
@@ -106,16 +110,34 @@ export function App() {
             <Tools />
           ) : path === '/yil-ozeti' ? (
             <Year />
+          ) : path === '/ayarlar' ? (
+            <Settings />
           ) : (
             <NotFound />
           )}
         </ErrorBoundary>
-        {/* Phones have no room for it in the top bar. */}
-        <footer className="mt-10 flex justify-center sm:hidden">
-          <LangToggle />
+        {/* Phones and narrow windows have no room for these in the top bar. */}
+        <footer className="mt-10 flex items-center justify-center gap-4 md:hidden">
+          <span className="sm:hidden">
+            <LangToggle />
+          </span>
+          <SettingsLink />
         </footer>
       </main>
     </div>
+  )
+}
+
+function SettingsLink() {
+  return (
+    <a
+      href="/ayarlar"
+      onClick={(e) => onLinkClick(e, '/ayarlar')}
+      className="flex items-center gap-1.5 rounded-md text-[12px] text-ink-2 hover:text-ink"
+    >
+      <SettingsIcon className="size-3.5 shrink-0" aria-hidden />
+      {tx('Ayarlar', 'Settings')}
+    </a>
   )
 }
 
