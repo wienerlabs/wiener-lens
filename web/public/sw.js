@@ -18,14 +18,23 @@ svg{height:22px;fill:currentColor}
 h1{margin:20px 0 8px;font-size:20px;font-weight:600;letter-spacing:-0.01em}
 p{margin:0 0 18px;color:var(--ink-2)}
 code{display:inline-block;padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;user-select:all}
+.start{display:inline-block;margin:0 0 22px;padding:11px 22px;border:0;border-radius:10px;background:#1c5cab;color:#fff;font:600 15px/1.2 system-ui,-apple-system,sans-serif;cursor:pointer}
+.start:disabled{opacity:.6;cursor:default}
+.cmd{display:inline-flex;gap:8px;align-items:center}
+.copy{padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink-2);font:13px/1.4 system-ui,-apple-system,sans-serif;cursor:pointer}
+.small{font-size:13px;margin:-6px 0 10px}
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
 <main>
 <svg viewBox="0 0 607 424" aria-hidden="true"><path fill-rule="evenodd" d="${MARK}"/></svg>
 <h1 data-en="Wiener Lens is not running">Wiener Lens çalışmıyor</h1>
-<p data-en="Run this in a terminal to start it. This window reloads by itself once the dashboard is up.">Başlatmak için terminalde şunu çalıştır. Panel açılınca bu pencere kendiliğinden yenilenir.</p>
-<code>npx wiener-tools-lens</code>
+<p id="lead" data-en="Run this in a terminal to start it. This window reloads by itself once the dashboard is up.">Başlatmak için terminalde şunu çalıştır. Panel açılınca bu pencere kendiliğinden yenilenir.</p>
+<button id="start" class="start" type="button" hidden data-en="Start Wiener Lens">Wiener Lens'i başlat</button>
+<p id="late" class="small" hidden data-en="Still not up? Check that “Start from the app with one click” is on in Wiener Lens settings, or run this in a terminal:">Hâlâ açılmadı mı? Wiener Lens ayarlarında “Uygulamadan tek tıkla başlat” açık olmalı; ya da terminalde şunu çalıştır:</p>
+<p id="or" class="small" hidden data-en="or in a terminal:">ya da terminalde:</p>
+<span class="cmd"><code>npx wiener-tools-lens</code><button id="copy" class="copy" type="button" data-en="Copy">Kopyala</button></span>
 </main>
 <script>
 let saved = null
@@ -40,6 +49,33 @@ if (lang === 'en') {
   document.documentElement.lang = 'en'
   for (const el of document.querySelectorAll('[data-en]')) el.textContent = el.dataset.en
 }
+const t = (tr, en) => (lang === 'en' ? en : tr)
+// On a Mac the launcher answers wiener-lens:// links; the button starts the dashboard in the background.
+const mac = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform ?? '')
+const start = document.getElementById('start')
+if (mac) {
+  document.getElementById('lead').textContent = t('Başlatmak için düğmeye bas; panel açılınca bu pencere kendiliğinden yenilenir.', 'Press the button to start it. This window reloads by itself once the dashboard is up.')
+  start.hidden = false
+  document.getElementById('or').hidden = false
+}
+start.addEventListener('click', () => {
+  start.disabled = true
+  start.textContent = t('Başlatılıyor…', 'Starting…')
+  location.href = 'wiener-lens://start'
+  setTimeout(() => {
+    start.disabled = false
+    start.textContent = t("Wiener Lens'i başlat", 'Start Wiener Lens')
+    document.getElementById('or').hidden = true
+    document.getElementById('late').hidden = false
+  }, 20000)
+})
+const copy = document.getElementById('copy')
+copy.addEventListener('click', () => {
+  navigator.clipboard?.writeText('npx wiener-tools-lens').then(() => {
+    copy.textContent = t('Kopyalandı', 'Copied')
+    setTimeout(() => { copy.textContent = t('Kopyala', 'Copy') }, 1500)
+  }, () => {})
+})
 setInterval(() => fetch('/api/status', { cache: 'no-store' }).then((r) => r.ok && location.reload(), () => {}), 1000)
 </script>
 </body>

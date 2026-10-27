@@ -12,9 +12,10 @@ import { openDb } from './db.ts'
 import { Indexer } from './indexer.ts'
 import { coworkSessionsDir, dataDir, desktopSessionsDir, historyFile, liveSessionsDir, projectsDir, terminalLang } from './paths.ts'
 import { Pricing } from './pricing.ts'
+import { setUpLauncher } from './launcher.ts'
 import { installStatusLine } from './statusline.ts'
 
-const VERSION = '0.9.0'
+const VERSION = '0.10.0'
 const LANG = terminalLang()
 const L = (tr: string, en: string) => pick(LANG, tr, en)
 
@@ -27,6 +28,7 @@ Kullanım: ${PACKAGE} [seçenekler]
   --host <h>    Bağlanılacak adres (varsayılan 127.0.0.1). 0.0.0.0 panelini yerel ağa açar.
   --lang <dil>  Panelin dili: tr ya da en (varsayılan tarayıcının dili)
   --no-open     Tarayıcıyı açma
+  --background  Arka planda başlat: tarayıcı açma, zaten çalışıyorsa çık
   -h, --help    Bu yardımı göster
   -v, --version Sürümü göster
 
@@ -40,6 +42,7 @@ Usage: ${PACKAGE} [options]
   --host <h>    Address to bind (default 127.0.0.1). 0.0.0.0 opens the panel to your local network.
   --lang <lang> Panel language: tr or en (default: your browser's language)
   --no-open     Don't open the browser
+  --background  Start in the background: no browser, and quit if it's already running
   -h, --help    Show this help
   -v, --version Show the version
 
@@ -48,7 +51,9 @@ Environment variables: CLAUDE_CONFIG_DIR, WIENER_DATA_DIR, WIENER_PORT, WIENER_L
 )
 
 function parseArgs(argv: string[]) {
-  const opts: { port: number; host: string; open: boolean; lang: Lang | null } = { port: Number(process.env.WIENER_PORT ?? 4747), host: '127.0.0.1', open: true, lang: null }
+  const opts: { port: number; host: string; open: boolean; lang: Lang | null; background: boolean } = {
+    port: Number(process.env.WIENER_PORT ?? 4747), host: '127.0.0.1', open: true, lang: null, background: false,
+  }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '-h' || a === '--help') {
@@ -67,7 +72,10 @@ function parseArgs(argv: string[]) {
       }
       opts.lang = lang
     } else if (a === '--no-open') opts.open = false
-    else {
+    else if (a === '--background') {
+      opts.background = true
+      opts.open = false
+    } else {
       process.stderr.write(`${L('Bilinmeyen seçenek', 'Unknown option')}: ${a}\n\n${HELP}`)
       process.exit(1)
     }
@@ -103,9 +111,25 @@ function openBrowser(url: string): void {
   spawn(cmd, args, { stdio: 'ignore', detached: true }).on('error', () => {}).unref()
 }
 
+/** Whether a dashboard already answers on this port. */
+async function running(host: string, port: number): Promise<boolean> {
+  try {
+    const res = await fetch(`http://${host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host}:${port}/api/status`, { signal: AbortSignal.timeout(1500) })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 async function main(): Promise<void> {
   const opts = parseArgs(process.argv.slice(2))
+  // Started by the launcher or at login: one dashboard is enough, on its usual port.
+  if (opts.background && (await running(opts.host, opts.port))) {
+    process.stdout.write(L(`  Wiener Lens zaten çalışıyor (port ${opts.port}).\n`, `  Wiener Lens is already running (port ${opts.port}).\n`))
+    process.exit(0)
+  }
   installStatusLine()
+  setUpLauncher()
   const dbFile = path.join(dataDir(), 'index.db')
   const db = openDb(dbFile)
   const pricing = Pricing.load()
@@ -127,7 +151,8 @@ async function main(): Promise<void> {
   const port = await new Promise<number>((resolve, reject) => {
     let attempt = opts.port
     server.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE' && attempt < opts.port + 20) server.listen(++attempt, opts.host)
+      // In the background the installed app expects the usual port; it doesn't move.
+      if (err.code === 'EADDRINUSE' && !opts.background && attempt < opts.port + 20) server.listen(++attempt, opts.host)
       else reject(err)
     })
     server.on('listening', () => resolve(attempt))
