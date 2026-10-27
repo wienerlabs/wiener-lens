@@ -12,10 +12,10 @@ import { openDb } from './db.ts'
 import { Indexer } from './indexer.ts'
 import { coworkSessionsDir, dataDir, desktopSessionsDir, historyFile, liveSessionsDir, projectsDir, terminalLang } from './paths.ts'
 import { Pricing } from './pricing.ts'
-import { setUpLauncher } from './launcher.ts'
+import { quitWhenClosedPref, setUpLauncher } from './launcher.ts'
 import { installStatusLine } from './statusline.ts'
 
-const VERSION = '0.10.0'
+const VERSION = '0.11.0'
 const LANG = terminalLang()
 const L = (tr: string, en: string) => pick(LANG, tr, en)
 
@@ -29,6 +29,7 @@ Kullanım: ${PACKAGE} [seçenekler]
   --lang <dil>  Panelin dili: tr ya da en (varsayılan tarayıcının dili)
   --no-open     Tarayıcıyı açma
   --background  Arka planda başlat: tarayıcı açma, zaten çalışıyorsa çık
+  --quit-when-closed  Panelin açık penceresi kalmayınca kapan (Ayarlar'daki tercihe göre)
   -h, --help    Bu yardımı göster
   -v, --version Sürümü göster
 
@@ -43,6 +44,7 @@ Usage: ${PACKAGE} [options]
   --lang <lang> Panel language: tr or en (default: your browser's language)
   --no-open     Don't open the browser
   --background  Start in the background: no browser, and quit if it's already running
+  --quit-when-closed  Quit once no dashboard window is open (as set in Settings)
   -h, --help    Show this help
   -v, --version Show the version
 
@@ -51,8 +53,8 @@ Environment variables: CLAUDE_CONFIG_DIR, WIENER_DATA_DIR, WIENER_PORT, WIENER_L
 )
 
 function parseArgs(argv: string[]) {
-  const opts: { port: number; host: string; open: boolean; lang: Lang | null; background: boolean } = {
-    port: Number(process.env.WIENER_PORT ?? 4747), host: '127.0.0.1', open: true, lang: null, background: false,
+  const opts: { port: number; host: string; open: boolean; lang: Lang | null; background: boolean; quitWhenClosed: boolean } = {
+    port: Number(process.env.WIENER_PORT ?? 4747), host: '127.0.0.1', open: true, lang: null, background: false, quitWhenClosed: false,
   }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
@@ -72,6 +74,7 @@ function parseArgs(argv: string[]) {
       }
       opts.lang = lang
     } else if (a === '--no-open') opts.open = false
+    else if (a === '--quit-when-closed') opts.quitWhenClosed = true
     else if (a === '--background') {
       opts.background = true
       opts.open = false
@@ -203,6 +206,39 @@ async function main(): Promise<void> {
   }
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  events.on('shutdown', shutdown)
+  if (opts.quitWhenClosed) quitWhenClosed(events, shutdown)
+}
+
+/**
+ * Closes the server once no dashboard window has been open for a little while: the app's windows
+ * each hold an event stream, so Cmd+Q drops the count to zero. The wait covers reloads, and a timer
+ * that fires late (the Mac slept) waits again for windows to reconnect. The setting is read when
+ * the time comes, so turning it off in Settings keeps this server up.
+ */
+function quitWhenClosed(events: EventEmitter, shutdown: () => void): void {
+  const GRACE = 20_000
+  let clients = 0
+  let timer: NodeJS.Timeout | null = null
+  const arm = (ms: number) => {
+    if (timer) clearTimeout(timer)
+    const due = Date.now() + ms
+    timer = setTimeout(() => {
+      timer = null
+      if (clients > 0 || !quitWhenClosedPref()) return
+      if (Date.now() - due > 5000) return arm(GRACE)
+      shutdown()
+    }, ms)
+  }
+  events.on('client', (delta: number) => {
+    clients = Math.max(0, clients + delta)
+    if (clients > 0 && timer) {
+      clearTimeout(timer)
+      timer = null
+    } else if (clients === 0) arm(GRACE)
+  })
+  // Started but no window ever came: don't stay up for nobody.
+  arm(2 * 60_000)
 }
 
 main().catch((err) => {

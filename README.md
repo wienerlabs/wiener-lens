@@ -126,6 +126,8 @@ Up to 0.7.0 the package was called `wiener-tools-claude`. The new one reads the 
 
 **Start it without a terminal (macOS).** When the server isn't running, the installed app's page has a **Start Wiener Lens** button: it opens a `wiener-lens://` link, a small launcher app starts the dashboard in the background with the latest package, and the window reloads once it is up. Wiener Lens puts the launcher in `~/Library/Application Support/Wiener Lens` the first time it runs; **Settings** (bottom of the left menu) removes it. Settings can also start Wiener Lens in the background when you log in; that is off by default, and turning it on adds a LaunchAgent (`~/Library/LaunchAgents/xyz.wienerlabs.lens.plist`) that turning it off removes. Started this way it logs to `~/.wiener-tools/claude/server.log`, never opens a browser tab of its own, and quits if a dashboard is already running. `--background` does the same from a terminal.
 
+A dashboard started with the Start button closes itself about 20 seconds after you quit the app (Cmd+Q), once no dashboard window is open; turn **Stop when you quit the app** off in Settings to keep it running. Settings also has a **Stop Wiener Lens** button, which shuts down whichever dashboard you are looking at.
+
 | Option | Default | Description |
 | --- | --- | --- |
 | `--port <n>` | `4747` | Port to listen on; if it is taken, the next one is tried |
@@ -133,6 +135,7 @@ Up to 0.7.0 the package was called `wiener-tools-claude`. The new one reads the 
 | `--lang <lang>` | your browser's language | Dashboard language: `tr` or `en` |
 | `--no-open` | | Don't open the browser |
 | `--background` | | Start in the background: no browser tab, and quit if a dashboard is already running |
+| `--quit-when-closed` | | Quit once no dashboard window is open, unless Settings says otherwise |
 | `-v`, `--version` | | Show the version |
 
 | Environment variable | Description |
